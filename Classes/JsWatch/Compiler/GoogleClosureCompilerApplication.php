@@ -20,6 +20,22 @@ namespace JsWatch\Compiler;
  */
 class GoogleClosureCompilerApplication extends AbstractGoogleClosureCompiler {
 
+	/**
+	 * Path to closure compiler application (compiler.jar)
+	 *
+	 * @var string
+	 */
+	protected $compilerPath;
+
+	/**
+	 * Constructor
+	 */
+	public function __construct() {
+		$this->compilerPath = __DIR__ . '/../../../Vendor/GoogleClosureCompiler/compiler.jar';
+		if (!file_exists($this->compilerPath)) {
+			throw new \JsWatch\Exception\MissingDependencyException('Could not find compiler.jar. ("' . $this->compilerPath . '")', 1355439975);
+		}
+	}
 
 	/**
 	 * Run the compiler on the given file and write the result to the target file
@@ -37,7 +53,7 @@ class GoogleClosureCompilerApplication extends AbstractGoogleClosureCompiler {
 		$options['js'] = $file->getPathname();
 		$options['js_output_file'] = $targetFile->getPathname();
 
-		$command = 'java -jar ' . escapeshellarg(__DIR__ . '/../../../Vendor/GoogleClosureCompiler/compiler.jar');
+		$command = 'java -jar ' . escapeshellarg($this->compilerPath);
 		array_walk($options, function($value, $option) use (&$command) {
 			$command .= ' --' . $option . ' ' . escapeshellarg($value);
 		});

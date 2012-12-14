@@ -26,10 +26,20 @@ class CompilerFactory {
 	private static $instance;
 
 	/**
+	 * List of class names of available compilers
+	 *
+	 * @var array
+	 */
+	protected $availableCompilerClasses = array();
+
+	/**
 	 * Private constructor for singleton
 	 */
 	private function __construct() {
-
+		$this->availableCompilerClasses = array(
+			'JsWatch\\Compiler\\GoogleClosureCompilerApplication',
+			'JsWatch\\Compiler\\GoogleClosureCompilerService',
+		);
 	}
 
 	/**
@@ -46,8 +56,17 @@ class CompilerFactory {
 	 * @return CompilerInterface
 	 */
 	public function getNewCompiler() {
-		//return new \JsWatch\Compiler\GoogleClosureCompilerService();
-		return new \JsWatch\Compiler\GoogleClosureCompilerApplication();
+		foreach ($this->availableCompilerClasses as $className) {
+			try {
+				/** @var $compiler CompilerInterface */
+				$compiler = new $className();
+				\JsWatch\Logger::getInstance()->debug('Using compiler ' . $className . '.');
+				return $compiler;
+			} catch (\JsWatch\Exception\MissingDependencyException $e) {
+				\JsWatch\Logger::getInstance()->debug('Not using compiler ' . $className . '. ' . $e->getMessage());
+			}
+		}
+		throw new \JsWatch\Exception\MissingDependencyException('Could not instantiate any compiler', 1355441071);
 	}
 }
 

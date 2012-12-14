@@ -28,7 +28,7 @@ class CompileJavaScriptWatcher implements WatcherInterface {
 	protected $compiler;
 
 	/**
-	 * @var Compiler\CompilationResultLogger
+	 * @var \JsWatch\Logger
 	 */
 	protected $logger;
 
@@ -37,7 +37,7 @@ class CompileJavaScriptWatcher implements WatcherInterface {
 	 */
 	public function __construct() {
 		$this->compiler = Compiler\CompilerFactory::getInstance()->getNewCompiler();
-		$this->logger = Compiler\CompilationResultLogger::getInstance();
+		$this->logger = \JsWatch\Logger::getInstance();
 	}
 
 	/**
@@ -69,11 +69,36 @@ class CompileJavaScriptWatcher implements WatcherInterface {
 		$this->logger->info('Detected change for ' . $fileName . ', compiling...');
 		try {
 			$result = $this->compiler->compileFile(new \SplFileInfo($fileName));
-			$this->logger->logCompilationResult($result);
+			$this->logCompilationResult($result);
 		} catch (\JsWatch\Exception\CommandExecutionException $e) {
 			$this->logger->critical($e->getMessage());
 		}
 	}
+
+	/**
+	 * Log a compilation result. This logs a generic status message and all warnings and errors.
+	 *
+	 * @param Compiler\CompilationResult $result
+	 */
+	protected function logCompilationResult(Compiler\CompilationResult $result) {
+		if ($result->isSuccessful()) {
+			$this->logger->ok('Successfully compiled ' . $result->getSourceFile()->getPathname(). ' to ' . $result->getTargetFile()->getPathname());
+		} else {
+			$this->logger->error('Failed compiling ' . $result->getSourceFile()->getPathname());
+		}
+
+		/** @var Compiler\Error $error */
+		foreach ($result->getErrors() as $error) {
+			$this->logger->error((string) $error);
+		}
+
+		/** @var Compiler\Warning $warning */
+		foreach ($result->getWarnings() as $warning) {
+			$this->logger->warn((string) $warning);
+		}
+	}
+
+
 }
 
 ?>

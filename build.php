@@ -1,6 +1,5 @@
-#!/usr/bin/php
+#!/usr/bin/php -d phar.readonly=0
 <?php
-
 /*
  * Copyright (c) 2012, Lienhart Woitok <mail@liwo.org>
  *
@@ -14,23 +13,23 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-namespace JsWatch;
-
-// This is necessary to register signal handlers, which are in turn needed to cleanly exit the script on Ctrl+C (SIGINT)
-// See http://php.net/manual/en/function.pcntl-signal.php for details
-declare(ticks = 1);
-
-try {
-	require(__DIR__ . '/Classes/JsWatch/Bootstrap.php');
-	\JsWatch\Bootstrap::run();
-
-	$workingDirectory = rtrim(getcwd(), '/') . '/';
-
-	//$monitor = new \JsWatch\FileSystemMonitor($workingDirectory);
-	$monitor = new \JsWatch\FileSystemMonitor();
-	$monitor->addWatcher(new \JsWatch\Watcher\CompileJavaScriptWatcher());
-	$monitor->run();
-} catch (\JsWatch\Exception\MissingDependencyException $e) {
-	Logger::getInstance()->critical('Missing dependency: ' . $e->getMessage());
-	exit(1);
+if (!Phar::canWrite()) {
+	die ("ERROR: Phar is not writeable\n");
 }
+unlink('js-watch.phar');
+$phar = new Phar('js-watch.phar');
+$phar->startBuffering();
+$phar->buildFromDirectory(__DIR__, '#^' . preg_quote(__DIR__, '#') . '/(?:Classes)/#');
+$indexScript = file_get_contents('js-watch.php');
+$phar['js-watch.php'] = substr($indexScript, strpos($indexScript, PHP_EOL) + 1);
+//$phar->setStub($phar->createDefaultStub('js-watch.php'));
+$phar->setStub(<<<EOS
+<?php
+	Phar::mapPhar(__FILE__);
+	require('phar://' . __FILE__ . '/js-watch.php');
+	__HALT_COMPILER();
+?>
+EOS
+);
+$phar->stopBuffering();
+
