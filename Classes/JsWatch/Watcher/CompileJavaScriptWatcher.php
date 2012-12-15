@@ -57,7 +57,7 @@ class CompileJavaScriptWatcher implements WatcherInterface {
 	public function checkFile($fileName) {
 		$file = new \SplFileInfo($fileName);
 		$targetFile = new \SplFileInfo($this->compiler->getTargetFileName($file));
-		return $targetFile->getMTime() > $file->getMTime();
+		return $targetFile->isFile() && $targetFile->getMTime() > $file->getMTime();
 	}
 
 	/**

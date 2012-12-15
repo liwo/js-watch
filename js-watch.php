@@ -21,16 +21,19 @@ namespace JsWatch;
 declare(ticks = 1);
 
 try {
-	require(__DIR__ . '/Classes/JsWatch/Bootstrap.php');
-	\JsWatch\Bootstrap::run();
+	require_once(__DIR__ . '/Classes/JsWatch/Bootstrap.php');
+	Bootstrap::run();
 
 	$workingDirectory = rtrim(getcwd(), '/') . '/';
 
-	//$monitor = new \JsWatch\FileSystemMonitor($workingDirectory);
-	$monitor = new \JsWatch\FileSystemMonitor();
-	$monitor->addWatcher(new \JsWatch\Watcher\CompileJavaScriptWatcher());
+	//$monitor = new FileSystemMonitor($workingDirectory);
+	$monitor = new FileSystemMonitor();
+	$monitor->addWatcher(new Watcher\CompileJavaScriptWatcher());
 	$monitor->run();
-} catch (\JsWatch\Exception\MissingDependencyException $e) {
+} catch (Exception\MissingDependencyException $e) {
 	Logger::getInstance()->critical('Missing dependency: ' . $e->getMessage());
 	exit(1);
+} catch (\Exception $e) {
+	Logger::getInstance()->critical('Uncaught exception: ' . $e);
+	exit(2);
 }

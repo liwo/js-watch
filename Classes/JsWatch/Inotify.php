@@ -35,6 +35,11 @@ class Inotify {
 	protected $monitoredPath;
 
 	/**
+	 * @var resource
+	 */
+	protected $process;
+
+	/**
 	 * The stdout of the inotifywait process
 	 *
 	 * @var resource
@@ -44,18 +49,24 @@ class Inotify {
 	/**
 	 *
 	 * @param string $path The path to monitor
+	 * @throws Exception\MissingDependencyException if inotifywait is not available
+	 * @throws Exception\InvalidPathException if the path does not exist
 	 */
 	public function __construct($path) {
 		$executablePath = exec('which inotifywait');
 		if (empty($executablePath)) {
-			throw new \JsWatch\Exception\MissingDependencyException('The program inotifywait could not be found in your path.', 1353535595);
+			throw new Exception\MissingDependencyException('The program inotifywait could not be found in your path.', 1353535595);
 		}
 		$this->executablePath = $executablePath;
 
 		if (!file_exists($path)) {
-			throw new \JsWatch\Exception\InvalidPathException('The path "' . $path . '" does not exist.', 1353536088);
+			throw new Exception\InvalidPathException('The path "' . $path . '" does not exist.', 1353536088);
 		}
 		$this->monitoredPath = $path;
+
+		// Workaround. In case of a fatal error __destruct is not called but shutdown functions are. (http://www.php.net/manual/en/language.oop5.decon.php#108598)
+		// Without this, the process hangs forever in case of a fatal error as inotifywait is not terminated
+		register_shutdown_function(array($this, '__destruct'));
 	}
 
 	/**
@@ -69,20 +80,21 @@ class Inotify {
 	 * Start the inotifywait process and monitor the given directory for changes
 	 *
 	 * @return Inotify Self for method call chaining
-	 * @throws Exception\InvalidPathException if the path does not exist
+	 * @throws Exception\CommandExecutionException if the process could not be started
 	 * @throws Exception\ProcessAlreadyRunningException if the process is already running
 	 */
 	public function start() {
-		if (is_resource($this->stdOut)) {
-			throw new \JsWatch\Exception\ProcessAlreadyRunningException('The inotify process is already running on path "' . $this->monitoredPath . '".', 1353536039);
+		if (is_resource($this->process)) {
+			throw new Exception\ProcessAlreadyRunningException('The inotify process is already running on path "' . $this->monitoredPath . '".', 1353536039);
 		}
 
-		$stdOut = popen($this->getInotifyWaitCommand(), 'r');
-		if ($stdOut === FALSE) {
-			throw new \JsWatch\Exception\CommandExecutionException('Unable to start inotifywait process.', 1353536690);
+		$process = proc_open($this->getInotifyWaitCommand(), array(1 => array('pipe', 'w')), $pipes);
+		if ($process === FALSE) {
+			throw new Exception\CommandExecutionException('Unable to start inotifywait process.', 1353536690);
 		}
 
-		$this->stdOut = $stdOut;
+		$this->process = $process;
+		$this->stdOut = $pipes[1];
 
 		return $this;
 	}
@@ -93,11 +105,14 @@ class Inotify {
 	 * @return Inotify Self for method call chaining
 	 */
 	public function stop() {
-		if (is_resource($this->stdOut)) {
-			pclose($this->stdOut);
+		if (is_resource($this->process)) {
+			fclose($this->stdOut);
+			// inotifywait does not exit it its STDOUT is closed, it needs to be killed explicitly
+			proc_terminate($this->process);
+			proc_close($this->process);
 			$this->stdOut = NULL;
+			$this->process = NULL;
 		}
-
 		return $this;
 	}
 
@@ -113,7 +128,6 @@ class Inotify {
 	/**
 	 *
 	 *
-	 * @param string $path
 	 * @return string
 	 */
 	protected function getInotifyWaitCommand() {
